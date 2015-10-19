@@ -123,10 +123,12 @@ e-mail   :  support@circuitsathome.com
 #endif
 #endif
 
+#if !defined(_86DUINO)
 #if !defined(EXT_RAM) && defined(EXT_RAM_STACK) || defined(EXT_RAM_HEAP)
 #include <xmem.h>
 #else
 #define EXT_RAM 0
+#endif
 #endif
 
 #if defined(CORE_TEENSY) && (defined(__MK20DX128__) || defined(__MK20DX256__) || defined(__MKL26Z64__))
@@ -135,7 +137,7 @@ e-mail   :  support@circuitsathome.com
 #define USING_SPI4TEENSY3 0
 #endif
 
-#if ((defined(ARDUINO_SAM_DUE) && defined(__SAM3X8E__)) || defined(RBL_NRF51822) || defined(__ARDUINO_X86__) || ARDUINO >= 10600) && !USING_SPI4TEENSY3
+#if ((defined(ARDUINO_SAM_DUE) && defined(__SAM3X8E__)) || defined(_86DUINO) || defined(RBL_NRF51822) || defined(__ARDUINO_X86__) || ARDUINO >= 10600) && !USING_SPI4TEENSY3
 #include <SPI.h> // Use the Arduino SPI library for the Arduino Due, RedBearLab nRF51822, Intel Galileo 1 & 2, Intel Edison or if the SPI library with transaction is available
 #endif
 #if defined(__PIC32MX__) || defined(__PIC32MZ__)

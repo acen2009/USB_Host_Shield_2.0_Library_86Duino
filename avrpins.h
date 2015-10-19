@@ -1142,7 +1142,7 @@ MAKE_PIN(P19, 19); // A5
 
 #undef MAKE_PIN
 
-#elif defined(__MIPSEL__)
+#elif defined(__MIPSEL__) || defined(_86DUINO)
 // MIPSEL (MIPS architecture using a little endian byte order)
 
 // MIPS size_t = 4
