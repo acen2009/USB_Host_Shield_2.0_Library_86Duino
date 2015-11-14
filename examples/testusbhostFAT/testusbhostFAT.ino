@@ -35,7 +35,7 @@
 
 // If you have external memory, setting this to 0 enables FAT table caches.
 // The 0 setting is recommended only if you have external memory.
-//#define _FS_TINY 1
+// #define _FS_TINY 0
 
 //#define _USE_LFN 3
 //#define _MAX_SS 512
@@ -48,7 +48,7 @@
 // You can set this to 0 if you are not using a USB hub.
 // It will save a little bit of flash and RAM.
 // Set to 1 if you want to use a hub.
-#define WANT_HUB_TEST 1
+#define WANT_HUB_TEST 0
 
 // this is for XMEM2
 #define EXT_RAM_STACK 1
@@ -59,8 +59,9 @@
 #include <xmem.h>
 #include <spi4teensy3.h>
 #endif
-
-#if defined(__AVR__)
+#if defined (_86DUINO)
+#include <SPI.h>
+#elif defined(__AVR__)
 #include <xmem.h>
 #include <SPI.h>
 #elif defined(ARDUINO_ARCH_SAM)
@@ -76,9 +77,10 @@
 #include <masstorage.h>
 #include <Storage.h>
 #include <PCpartition/PCPartition.h>
-#include <avr/interrupt.h>
+//#include <avr/interrupt.h>
 #include <FAT/FAT.h>
 #include <stdio.h>
+
 #if defined(__AVR__)
 static FILE tty_stdio;
 static FILE tty_stderr;
@@ -118,11 +120,11 @@ static uint8_t My_Buff_x[mbxs]; /* File read buffer */
 
 #if defined(__AVR__)
 
-#define prescale1       ((1 << WGM12) | (1 << CS10))
-#define prescale8       ((1 << WGM12) | (1 << CS11))
-#define prescale64      ((1 << WGM12) | (1 << CS10) | (1 << CS11))
-#define prescale256     ((1 << WGM12) | (1 << CS12))
-#define prescale1024    ((1 << WGM12) | (1 << CS12) | (1 << CS10))
+//#define prescale1       ((1 << WGM12) | (1 << CS10))
+//#define prescale8       ((1 << WGM12) | (1 << CS11))
+//#define prescale64      ((1 << WGM12) | (1 << CS10) | (1 << CS11))
+//#define prescale256     ((1 << WGM12) | (1 << CS12))
+//#define prescale1024    ((1 << WGM12) | (1 << CS12) | (1 << CS10))
 
 extern "C" {
          extern unsigned int freeHeap();
@@ -154,7 +156,7 @@ static int __attribute__((unused)) tty_std_flush(FILE *t) {
 
 #else
 // Supposedly the DUE has stdio already pointing to serial...
-#if !defined(ARDUINO_ARCH_SAM)
+#if !defined(ARDUINO_ARCH_SAM) && !defined (_86DUINO)
 // But newlib needs this...
 extern "C" {
         int _write(int fd, const char *ptr, int len) {
@@ -245,6 +247,18 @@ void setup() {
         stdin = &tty_stdio;
         stderr = &tty_stderr;
 #endif
+
+#if defined(_86DUINO)
+        Serial.print("\r\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nStart\r\n");
+        Serial.print("Current UsbDEBUGlvl");
+        Serial.print(UsbDEBUGlvl, HEX);
+        Serial.print("\r\n");
+        Serial.print(PSTR("'+' and '-' increase/decrease by 0x01\r\n"));
+        Serial.print(PSTR("'.' and ',' increase/decrease by 0x10\r\n"));
+        Serial.print(PSTR("'t' will run a 10MB write/read test and print out the time it took.\r\n"));
+        Serial.print(PSTR("'e' will toggle vbus off for a few moments.\r\n\r\n"));
+        Serial.print(PSTR("Long filename support: "
+#else
         printf_P(PSTR("\r\n\n\n\n\n\n\n\n\n\n\n\n\n\n\nStart\r\n"));
         printf_P(PSTR("Current UsbDEBUGlvl %02x\r\n"), UsbDEBUGlvl);
         printf_P(PSTR("'+' and '-' increase/decrease by 0x01\r\n"));
@@ -252,6 +266,7 @@ void setup() {
         printf_P(PSTR("'t' will run a 10MB write/read test and print out the time it took.\r\n"));
         printf_P(PSTR("'e' will toggle vbus off for a few moments.\r\n\r\n"));
         printf_P(PSTR("Long filename support: "
+#endif
 #if _USE_LFN
                 "Enabled"
 #else
@@ -310,7 +325,7 @@ void setup() {
                 printf_P(PSTR("No USB HOST Shield?\r\n"));
                 Notify(PSTR("OSC did not start."), 0x40);
         }
-
+/*
 #if !defined(CORE_TEENSY) && defined(__AVR__)
         cli();
         TCCR3A = 0;
@@ -323,6 +338,7 @@ void setup() {
 
         HEAPnext_time = millis() + 10000;
 #endif
+*/
 #if defined(__AVR__)
         HEAPnext_time = millis() + 10000;
 #endif
@@ -415,7 +431,7 @@ void loop() {
         }
         TCCR3B = 0;
 #endif
-#if defined(CORE_TEENSY)
+#if defined(CORE_TEENSY) || defined (_86DUINO)
         // Teensy suffers here, oh well...
         serialEvent();
 #endif
@@ -430,7 +446,11 @@ void loop() {
                 change = false;
                 if(usbon) {
                         Usb.vbusPower(vbus_on);
+#if defined(_86DUINO)
+                        Serial.print(PSTR("VBUS on\r\n"));
+#else
                         printf_P(PSTR("VBUS on\r\n"));
+#endif
                 } else {
                         Usb.vbusPower(vbus_off);
                         usbon_time = millis() + 2000;
@@ -440,7 +460,13 @@ void loop() {
         current_state = Usb.getUsbTaskState();
         if(current_state != last_state) {
                 if(UsbDEBUGlvl > 0x50)
+#if defined(_86DUINO)
+                        Serial.print("USB state = ");
+                        Serial.print(current_state, HEX);
+                        Serial.print("\r\n");
+#else
                         printf_P(PSTR("USB state = %x\r\n"), current_state);
+#endif
 #if !defined(CORE_TEENSY) && defined(__AVR__)
                 if(current_state == USB_STATE_RUNNING) {
                         fadeAmount = 30;
@@ -474,7 +500,7 @@ void loop() {
 
                                 // Build a list.
                                 int ML = UHS_USB_BulkOnly[B]->GetbMaxLUN();
-                                //printf("MAXLUN = %i\r\n", ML);
+                                // printf("MAXLUN = %i\r\n", ML);
                                 ML++;
                                 for(int i = 0; i < ML; i++) {
                                         if(UHS_USB_BulkOnly[B]->LUNIsGood(i)) {
@@ -488,9 +514,15 @@ void loop() {
                                                 sto[i].Commit = *UHS_USB_BulkOnly_Commit;
                                                 sto[i].TotalSectors = UHS_USB_BulkOnly[B]->GetCapacity(i);
                                                 sto[i].SectorSize = UHS_USB_BulkOnly[B]->GetSectorSize(i);
+#if defined (_86DUINO)
+                                                Serial.print("LUN:\t\t"); Serial.print(i, DEC);Serial.print("\r\n");
+                                                Serial.print("Total Sectors:\t"); Serial.print(sto[i].TotalSectors, HEX);Serial.print("\t");Serial.print(sto[i].TotalSectors, DEC);Serial.print("\r\n");
+                                                Serial.print("Sector Size:\t"); Serial.print(sto[i].SectorSize, HEX);Serial.print("\t\t");Serial.print(sto[i].SectorSize, DEC);Serial.print("\r\n");
+#else
                                                 printf_P(PSTR("LUN:\t\t%u\r\n"), i);
                                                 printf_P(PSTR("Total Sectors:\t%08lx\t%lu\r\n"), sto[i].TotalSectors, sto[i].TotalSectors);
                                                 printf_P(PSTR("Sector Size:\t%04x\t\t%u\r\n"), sto[i].SectorSize, sto[i].SectorSize);
+#endif
                                                 // get the partition data...
                                                 PT = new PCPartition;
 
@@ -500,7 +532,11 @@ void loop() {
                                                                 apart = PT->GetPart(j);
                                                                 if(apart != NULL && apart->type != 0x00) {
                                                                         memcpy(&(parts[cpart]), apart, sizeof (part_t));
+#if defined (_86DUINO)
+                                                                        Serial.print("Partition "); Serial.print(j, DEC);Serial.print(" type ");Serial.print(parts[cpart].type, HEX);Serial.print("\r\n");
+#else
                                                                         printf_P(PSTR("Partition %u type %#02x\r\n"), j, parts[cpart].type);
+#endif
                                                                         // for now
                                                                         if(isfat(parts[cpart].type)) {
                                                                                 Fats[cpart] = new PFAT(&sto[i], cpart, parts[cpart].firstSector);
@@ -570,11 +606,25 @@ void loop() {
                                 for(int zz = 0; zz < _VOLUMES; zz++) {
                                         if(Fats[zz]->volmap == 0) fs = Fats[zz]->ffs;
                                 }
+#if defined (_86DUINO)
+                                Serial.print("\r\nOpen an existing file (message.txt).\r\n");
+#else
                                 printf_P(PSTR("\r\nOpen an existing file (message.txt).\r\n"));
+#endif
                                 rc = f_open(&My_File_Object_x, "0:/MESSAGE.TXT", FA_READ);
-                                if(rc) printf_P(PSTR("Error %i, message.txt not found.\r\n"), rc);
-                                else {
+                                if(rc)
+                                {
+#if defined (_86DUINO)
+                                    Serial.print("Error ");Serial.print(rc, DEC);Serial.print(", message.txt not found.\r\n");
+#else
+                                    printf_P(PSTR("Error %i, message.txt not found.\r\n"), rc);
+#endif
+                                } else {
+#if defined (_86DUINO)
+                                        Serial.print("\r\nType the file content.\r\n");
+#else
                                         printf_P(PSTR("\r\nType the file content.\r\n"));
+#endif
                                         for(;;) {
                                                 rc = f_read(&My_File_Object_x, My_Buff_x, mbxs, &br); /* Read a chunk of file */
                                                 if(rc || !br) break; /* Error or end of file */
@@ -591,25 +641,40 @@ void loop() {
                                                 f_close(&My_File_Object_x);
                                                 goto out;
                                         }
-
+#if defined (_86DUINO)
+                                        Serial.print("\r\nClose the file.\r\n");
+#else
                                         printf_P(PSTR("\r\nClose the file.\r\n"));
+#endif
                                         rc = f_close(&My_File_Object_x);
                                         if(rc) goto out;
                                 }
+#if defined (_86DUINO)
+                                Serial.print(PSTR("\r\nCreate a new file (hello.txt).\r\n"));
+#else
                                 printf_P(PSTR("\r\nCreate a new file (hello.txt).\r\n"));
+#endif
                                 rc = f_open(&My_File_Object_x, "0:/Hello.TxT", FA_WRITE | FA_CREATE_ALWAYS);
                                 if(rc) {
                                         die(rc);
                                         goto outdir;
                                 }
+#if defined (_86DUINO)
+                                Serial.print(PSTR("\r\nWrite a text data. (Hello world!)\r\n"));
+#else
                                 printf_P(PSTR("\r\nWrite a text data. (Hello world!)\r\n"));
+#endif
                                 rc = f_write(&My_File_Object_x, "Hello world!\r\n", 14, &bw);
                                 if(rc) {
                                         goto out;
                                 }
+#if defined (_86DUINO)
+                                Serial.print(bw, DEC);Serial.print(" bytes written.\r\n");
+                                Serial.print("\r\nClose the file.\r\n");
+#else
                                 printf_P(PSTR("%u bytes written.\r\n"), bw);
-
                                 printf_P(PSTR("\r\nClose the file.\r\n"));
+#endif
                                 rc = f_close(&My_File_Object_x);
                                 if(rc) {
                                         die(rc);
@@ -622,14 +687,21 @@ outdir:{
                                         My_File_Info_Object_x.lfname = lfn;
 #endif
                                         DIR My_Dir_Object_x; /* Directory object */
+#if defined (_86DUINO)
+                                        Serial.print("\r\nOpen root directory.\r\n");
+#else
                                         printf_P(PSTR("\r\nOpen root directory.\r\n"));
+#endif
                                         rc = f_opendir(&My_Dir_Object_x, "0:/");
                                         if(rc) {
                                                 die(rc);
                                                 goto out;
                                         }
-
+#if defined (_86DUINO)
+                                        Serial.print("\r\nDirectory listing...\r\n");
+#else
                                         printf_P(PSTR("\r\nDirectory listing...\r\n"));
+#endif
 #if defined(__AVR__)
                                         printf_P(PSTR("Available heap: %u Bytes\r\n"), freeHeap());
 #endif
@@ -673,17 +745,31 @@ outdir:{
 
 #if _USE_LFN
                                                 if(*My_File_Info_Object_x.lfname)
+                                                {
+#if defined (_86DUINO)
+                                                        Serial.print(" ");Serial.print(My_File_Info_Object_x.fsize, DEC);Serial.print("  ");Serial.print(My_File_Info_Object_x.fname);Serial.print(" (");Serial.print(My_File_Info_Object_x.lfname);Serial.print(")\r\n");
+#else
                                                         printf_P(PSTR(" %8lu  %s (%s)\r\n"), My_File_Info_Object_x.fsize, My_File_Info_Object_x.fname, My_File_Info_Object_x.lfname);
-                                                else
 #endif
+                                                } else {
+#endif
+#if defined (_86DUINO)
+                                                        Serial.print(" ");Serial.print(My_File_Info_Object_x.fsize, DEC);Serial.print("  ");Serial.print(&(My_File_Info_Object_x.fname[0]));Serial.print("\r\n");
+#else
                                                         printf_P(PSTR(" %8lu  %s\r\n"), My_File_Info_Object_x.fsize, &(My_File_Info_Object_x.fname[0]));
+#endif
+                                                }
                                         }
                                 }
 out:
                                 if(rc) die(rc);
 
                                 DISK_IOCTL(fs->drv, CTRL_COMMIT, 0);
+#if defined (_86DUINO)
+                                Serial.print("\r\nTest completed.\r\n");
+#else
                                 printf_P(PSTR("\r\nTest completed.\r\n"));
+#endif
 
                         }
 
